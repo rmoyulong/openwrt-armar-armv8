@@ -1,0 +1,255 @@
+#云编译公用核心
+name: ophub编译公用核心
+
+on:
+  #公用核心标识
+  workflow_call:
+    inputs:
+      OWRT_TARGET:
+        required: true
+        type: string
+      OWRT_THEME:
+        required: true
+        type: string
+      OWRT_NAME:
+        required: true
+        type: string
+      OWRT_URL:
+        required: true
+        type: string
+      OWRT_PW:
+        required: true
+        type: string
+      OWRT_IP:
+        required: true
+        type: string
+      OWRT_CFG:
+        required: true
+        type: string
+      OWRT_BRANCH:
+        required: true
+        type: string
+      OWRT_TYPE:
+        required: true
+        type: string
+      OWRT_LINUX:
+        required: true
+        type: string
+      OWRT_FILES:
+        required: true
+        type: string
+      DIY_P1_SH:
+        required: true
+        type: string
+      DIY_P2_SH:
+        required: true
+        type: string
+      OWRT_STORAGE:
+        required: true
+        type: string 
+      kernel_repo:
+        required: true
+        type: string
+      kernel_usage:
+        required: true
+        type: string
+      builder_name:
+        required: true
+        type: string
+      auto_kernel:
+        required: true
+        type: string   
+        
+env:
+  GITHUB_TOKEN: ${{secrets.GITHUB_TOKEN}}
+  OWRT_TARGET: ${{inputs.OWRT_TARGET}}
+  OWRT_THEME: ${{inputs.OWRT_THEME}}
+  OWRT_NAME: ${{inputs.OWRT_NAME}}
+  OWRT_URL: ${{inputs.OWRT_URL}}
+  OWRT_PW: ${{inputs.OWRT_PW}}
+  OWRT_IP: ${{inputs.OWRT_IP}}
+  OWRT_CFG: ${{inputs.OWRT_CFG}}
+  OWRT_BRANCH: ${{inputs.OWRT_BRANCH}}
+  OWRT_TYPE: ${{inputs.OWRT_TYPE}}
+  OWRT_LINUX: ${{inputs.OWRT_LINUX}}
+  OWRT_FILES: ${{inputs.OWRT_FILES}}
+  OWRT_STORAGE: ${{inputs.OWRT_STORAGE}}
+  DIY_P1_SH: ${{inputs.DIY_P1_SH}}
+  DIY_P2_SH: ${{inputs.DIY_P2_SH}}
+  kernel_repo: ${{inputs.kernel_repo}}
+  kernel_usage: ${{inputs.kernel_usage}}
+  builder_name: ${{inputs.builder_name}}
+  auto_kernel: ${{inputs.auto_kernel}}
+  TZ: Asia/Shanghai
+  #USE_CACHEWRTBUILD: true
+  
+jobs:
+  owrt_core_source_ophub:
+    runs-on: ubuntu-latest
+    steps:
+      - name: 清理服务器空间(Ubuntu)
+        uses: rmoyulong/free-disk-space@main
+        with:
+          # this might remove tools that are actually needed,
+          # if set to "true" but frees about 6 GB
+          tool-cache: true
+
+          # all of these default to true, but feel free to set to
+          # "false" if necessary for your workflow
+          android: true
+          dotnet: true
+          haskell: true
+          large-packages: true
+          docker-images: true
+          swap-storage: true
+          
+      - name: 项目检查
+        uses: actions/checkout@main
+
+      - name: 检查分配的服务器性能
+        run: |
+          echo "警告⚠"
+          echo "分配的服务器性能有限，若选择的插件过多，务必注意CPU性能！"
+          echo -e "已知CPU型号（降序）：7763，8370C，8272CL，8171M，E5-2673 \n"
+          echo "--------------------------CPU信息--------------------------"
+          echo "CPU物理数量：$(cat /proc/cpuinfo | grep "physical id" | sort | uniq | wc -l)"
+          echo -e "CPU核心信息：$(cat /proc/cpuinfo | grep name | cut -f2 -d: | uniq -c) \n"
+          echo "--------------------------内存信息--------------------------"
+          echo "已安装内存详细信息："
+          echo -e "$(sudo lshw -short -C memory | grep GiB) \n"
+          echo "--------------------------硬盘信息--------------------------"
+          echo "硬盘数量：$(ls /dev/sd* | grep -v [1-9] | wc -l)" && df -hT        
+          
+      - name: 初始化编译环境
+        env:
+          DEBIAN_FRONTEND: noninteractive
+        run: |
+          sudo -E apt-get -qq update
+          sudo -E apt-get -qq install $(curl -fsSL https://raw.githubusercontent.com/rmoyulong/OneCloud_OpenWrt/master/Ubuntu-2204.txt)
+          sudo -E apt-get -qq autoremove --purge
+          sudo -E apt-get -qq clean
+          sudo timedatectl set-timezone "$TZ"
+          sudo mkdir -p /workdir
+          sudo chown $USER:$GROUPS /workdir
+          echo "status=success" >> ${GITHUB_OUTPUT}
+          df -Th         
+
+      - name: 初始化变量
+        run: |
+          export OWRT_DATE=$(TZ=UTC-8 date +"%y.%m.%d_%H.%M.%S")
+          export OWRT_SOURCE=$(echo $OWRT_URL | cut -d '/' -f 5-)
+          #export OWRT_TYPE="cortex-a53"
+
+          echo "OWRT_SOURCE=$OWRT_SOURCE" >> $GITHUB_ENV
+          echo "OWRT_TARGET=$OWRT_TARGET" >> $GITHUB_ENV
+          echo "OWRT_DATE=$OWRT_DATE" >> $GITHUB_ENV
+          echo "OWRT_TYPE=$OWRT_TYPE" >> $GITHUB_ENV
+          echo "OWRT_PW=$OWRT_PW" >> $GITHUB_ENV
+          echo "OWRT_IP=$OWRT_IP" >> $GITHUB_ENV
+          echo "OWRT_LINUX=$OWRT_LINUX" >> $GITHUB_ENV
+          echo "OWRT_FILES=$OWRT_FILES" >> $GITHUB_ENV
+          echo "OWRT_STORAGE=$OWRT_STORAGE" >> $GITHUB_ENV
+
+      - name: 检查脚本
+        run: |
+          cd ./Scripts
+
+          dos2unix ./*.sh
+          chmod +x ./*.sh
+
+      - name: 克隆源码库
+        working-directory: /workdir
+        run: |
+          # Set up compilation source code
+          if [[ "${{ inputs.OWRT_URL }}" == *"openwrt"* ]]; then
+              REPO_URL="https://github.com/openwrt/openwrt"
+              REPO_BRANCH="main"
+              TAGS_NAME="official"
+          elif [[ "${{ inputs.OWRT_URL }}" == *"lede"* ]]; then
+              REPO_URL="https://github.com/coolsnowwolf/lede"
+              REPO_BRANCH="master"
+              TAGS_NAME="lede"
+          elif [[ "${{ inputs.OWRT_URL }}" == *"immortalwrt"* ]]; then
+              REPO_URL="https://github.com/immortalwrt/immortalwrt"
+              REPO_BRANCH="master"
+              TAGS_NAME="immortalwrt"
+          else
+              echo "Unknown source code repository."
+              exit 1
+          fi        
+        
+          df -hT $PWD
+          git clone -q --single-branch --depth=1 --branch=${REPO_BRANCH} ${REPO_URL} openwrt
+          #git clone $OWRT_URL -b $OWRT_BRANCH openwrt
+          #git clone $OWRT_URL openwrt
+          ln -sf /workdir/openwrt $GITHUB_WORKSPACE/openwrt
+          [ -e $GITHUB_WORKSPACE/Config/$OWRT_CFG ] && echo "DEVICE_NAME=$(grep '^CONFIG_TARGET_.*_.*_DEVICE_.*=y' $GITHUB_WORKSPACE/Config/$OWRT_CFG | sed -r 's/.*DEVICE_(.*)=y/\1/')" >> $GITHUB_ENV
+
+          # Set output information
+          echo "build_tag=OpenWrt_${OWRT_TARGET}_${{ env.OWRT_STORAGE }}_$(date +"%Y.%m")" >> ${GITHUB_OUTPUT}
+          echo -e "REPO_URL: [ ${REPO_URL} ]\nREPO_BRANCH: [ ${REPO_BRANCH} ]\nTAGS_NAME: [ ${OWRT_NAME} ]"
+          df -hT ${PWD}
+          echo "status=success" >> ${GITHUB_OUTPUT}  
+ 
+      - name: 设置编译固件的参数
+        id: setup_base
+        if: ${{ steps.compile.outputs.status }} == 'success' && !cancelled()
+        run: |
+          # Clean up server space
+          
+          cd openwrt/
+          mkdir -p output
+          
+          #获得rootfs.tar.gz的路径并下载
+          $GITHUB_WORKSPACE/patch/$DIY_P1_SH
+        
+          # Generate sha256sum file
+          cd output/
+          for file in *; do [[ ! -d "${file}" ]] && sha256sum "${file}" >"${file}.sha"; done
+
+          # Set output information
+          df -hT ${PWD}
+          echo "status=success" >> ${GITHUB_OUTPUT}
+          
+      - name: 把底包转换为固件
+        if: ${{ steps.setup_base.outputs.status }} == 'success' && !cancelled()
+        uses: ophub/amlogic-s9xxx-openwrt@main
+        with:
+          openwrt_path: openwrt/output/*rootfs.tar.gz
+          openwrt_board: ${{ env.OWRT_TARGET }}
+          openwrt_kernel: ${{ env.OWRT_LINUX }}
+          auto_kernel: ${{ inputs.auto_kernel }}
+          kernel_repo: ${{ inputs.kernel_repo }}
+          kernel_usage: ${{ inputs.kernel_usage }}
+          builder_name: ${{ inputs.builder_name }}
+
+      - name: 上传固件
+        uses: rmoyulong/action-gh-release@master
+        if: ${{ env.PACKAGED_STATUS == 'success' }} && !cancelled()
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: OpenWrt_${{ env.OWRT_TARGET }}_${{ env.OWRT_DATE }}
+          files: ${{ env.PACKAGED_OUTPUTPATH }}/*
+          body: |
+            自用${{env.OWRT_TYPE}}【${{ inputs.kernel_usage }}】固件！首次使用建议全新刷写！
+            =============基本信息============
+
+            源码：${{env.OWRT_SOURCE}}
+            平台：${{env.OWRT_TARGET}}
+            设备：${{env.OWRT_TYPE}}
+            密码：${{env.OWRT_PW}}
+            地址：${{env.OWRT_IP}}
+            内核：${{env.OWRT_LINUX}}
+
+      - name: 清理Releases
+        uses: rmoyulong/delete-older-releases@master
+        with:
+          keep_latest: 10
+          delete_tags: true
+
+      - name: 清理Workflows
+        uses: rmoyulong/delete-workflow-runs@main
+        with:
+          retain_days: 0
+          keep_minimum_runs: 1

@@ -437,7 +437,8 @@ jobs:
           
           export CORE_DATE=$(TZ=UTC-8 date +"%y.%m.%d_%H.%M.%S")
           echo "CORE_DATE=$CORE_DATE" >> $GITHUB_ENV
-          show_tag_name=${{env.CORE_TARGET}}_${{env.CORE_SOURCE}}_${{env.CORE_DATE}}
+          #固定上传路径
+          show_tag_name=${{env.CORE_TARGET}}_${{env.CORE_SOURCE}}_Latest
           echo "show_tag_name=$show_tag_name" >> $GITHUB_ENV
           #获得当前目录的路径信息
           cd ./upload
