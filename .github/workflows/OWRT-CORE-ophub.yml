@@ -152,7 +152,7 @@ jobs:
 
       - name: 检查脚本
         run: |
-          cd ./Scripts
+          cd ./patch
 
           dos2unix ./*.sh
           chmod +x ./*.sh
