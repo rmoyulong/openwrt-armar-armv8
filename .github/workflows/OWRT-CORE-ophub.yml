@@ -224,13 +224,11 @@ jobs:
           builder_name: ${{ inputs.builder_name }}
 
       - name: 上传固件
-        uses: rmoyulong/action-gh-release@master
-        if: ${{ env.PACKAGED_STATUS == 'success' }} && !cancelled()
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        uses: ncipollo/release-action@v1
         with:
-          tag_name: OpenWrt_${{ env.OWRT_TARGET }}_${{ env.OWRT_DATE }}
-          files: ${{ env.PACKAGED_OUTPUTPATH }}/*
+          allowUpdates: true
+          token: ${{ secrets.GITHUB_TOKEN }}
+          tag: OpenWrt_${{ env.OWRT_TARGET }}_${{ env.OWRT_DATE }}
           body: |
             自用${{env.OWRT_TYPE}}【${{ inputs.kernel_usage }}】固件！首次使用建议全新刷写！
             =============基本信息============
@@ -241,7 +239,8 @@ jobs:
             密码：${{env.OWRT_PW}}
             地址：${{env.OWRT_IP}}
             内核：${{env.OWRT_LINUX}}
-
+          artifacts: ${{ env.PACKAGED_OUTPUTPATH }}/*
+          
       - name: 清理Releases
         uses: rmoyulong/delete-older-releases@master
         with:
