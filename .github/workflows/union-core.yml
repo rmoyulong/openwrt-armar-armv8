@@ -185,7 +185,13 @@ jobs:
         run: |
           sudo -E apt-get -qq update --fix-missing
           sudo -E apt-get -qq full-upgrade
-          sudo -E apt-get -y install $(cat $GITHUB_WORKSPACE/Ubuntu-2204.txt)
+          
+          if [[ "${{ inputs.CORE_URL }}" == *"lede"* ]]; then
+            sudo -E apt-get -y install $(cat $GITHUB_WORKSPACE/Ubuntu-2204.txt)
+          else
+            sudo -E apt-get -qq install -y $(curl -fsSL https://raw.githubusercontent.com/rmoyulong/AX6-Actions_Lede/master/Ubuntu-2410.txt)
+          fi
+          
           sudo -E apt-get -qq autoremove --purge
           sudo -E apt-get -qq clean
           sudo -E systemctl daemon-reload
@@ -266,24 +272,8 @@ jobs:
         working-directory: /workdir        
         run: |
           # Set up compilation source code
-          if [[ "${{ inputs.CORE_URL }}" == *"openwrt/openwrt"* ]]; then
-              REPO_URL="https://github.com/openwrt/openwrt"
-              REPO_BRANCH="main"
-          elif [[ "${{ inputs.CORE_URL }}" == *"coolsnowwolf/lede"* ]]; then
-              REPO_URL="https://github.com/coolsnowwolf/lede"
-              REPO_BRANCH="master"
-          elif [[ "${{ inputs.CORE_URL }}" == *"immortalwrt/immortalwrt"* ]]; then
-              REPO_URL="https://github.com/immortalwrt/immortalwrt"
-              REPO_BRANCH="master"
-          else
-              REPO_URL="${{ inputs.CORE_URL }}"
-              REPO_BRANCH="${{ inputs.CORE_BRANCH }}"
-          fi
-          
-          if [[ $CORE_LINUX == *"5.15"* ]] ; then
-              REPO_URL="${{ inputs.CORE_URL }}"
-              REPO_BRANCH="${{ inputs.CORE_BRANCH }}"
-          fi
+          REPO_URL="${{ inputs.CORE_URL }}"
+          REPO_BRANCH="${{ inputs.CORE_BRANCH }}"
           
           df -hT $PWD
           git clone -q --single-branch --depth=1 --branch=${REPO_BRANCH} ${REPO_URL} openwrt
