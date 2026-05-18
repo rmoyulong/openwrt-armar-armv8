@@ -108,7 +108,7 @@ jobs:
       #save/temp
       kernel_repo: ophub/kernel
       #stable/flippy/dev/beta
-      kernel_usage: stable
+      kernel_usage: flippy
       builder_name: ophub
       auto_kernel: true
       ########################################################
