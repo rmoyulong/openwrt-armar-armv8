@@ -431,9 +431,7 @@ jobs:
             show_tag_name="Docker_Mini"
           elif [[ "${{ inputs.CORE_config }}" == *"N1-armsr-latest"* ]]; then
             show_tag_name="Docker_Latest"
-          fi
-          
-          if [[ "${{ env.CORE_SOURCE }}" == *"openwrt"* ]]; then
+          else
             show_tag_name=${{env.CORE_TARGET}}_${{env.CORE_SOURCE}}_Latest
           fi
           
