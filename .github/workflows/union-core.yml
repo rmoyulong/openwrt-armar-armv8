@@ -308,8 +308,12 @@ jobs:
         run: |
           cd openwrt
           
-          ./scripts/feeds update -a
-          ./scripts/feeds install -a
+          if [[ "${{ inputs.CORE_before_P1_SH }}" == *"false"* ]]; then
+            echo "不需要执行 CORE_before_P1_SH"
+          else
+            ${GITHUB_WORKSPACE}/${CORE_before_P1_SH} "${CORE_FILES}" "${CORE_header}"
+          fi          
+          echo "COMMIT_HASH=$(git rev-parse HEAD)" >> $GITHUB_ENV
           
       - name: 后置补丁
         run: |
@@ -322,13 +326,6 @@ jobs:
       - name: 通用脚本
         run: |
           cd openwrt
-          
-          if [[ "${{ inputs.CORE_before_P1_SH }}" == *"false"* ]]; then
-            echo "不需要执行 CORE_before_P1_SH"
-          else
-            ${GITHUB_WORKSPACE}/${CORE_before_P1_SH} "${CORE_FILES}" "${CORE_header}"
-          fi          
-          echo "COMMIT_HASH=$(git rev-parse HEAD)" >> $GITHUB_ENV
           
           curl -L -o package/base-files/files/etc/banner https://raw.githubusercontent.com/rmoyulong/AX6-Actions_Lede/master/ax6/cats_banner
           ${GITHUB_WORKSPACE}/${CORE_after_P1_SH} "${{ env.CORE_IP }}" "${{ env.CORE_NAME }}" "${{ env.CORE_THEME }}" "${{ env.CORE_SOURCE }}"
